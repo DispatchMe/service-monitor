@@ -56,18 +56,18 @@ func (g *GraphiteCheck) Run(serviceName string) error {
 	response := make([]*GraphiteResponse, 0)
 	req, err := http.NewRequest("GET", shared.GraphiteConf.Url+"render?"+query.Encode(), nil)
 	if err != nil {
-		return err
+		return errors.New(fmt.Sprintf("[%s - %s] %s", serviceName, g.Name, err.Error()))
 	}
 	req.Close = true
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return errors.New(fmt.Sprintf("[%s - %s] %s", serviceName, g.Name, err.Error()))
 	}
 
 	decoder := json.NewDecoder(resp.Body)
 	err = decoder.Decode(&response)
 	if err != nil {
-		return err
+		return errors.New(fmt.Sprintf("[%s - %s] %s", serviceName, g.Name, err.Error()))
 	}
 
 	flist := floatlist.Floatlist{}

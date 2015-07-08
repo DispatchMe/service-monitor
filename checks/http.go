@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -46,16 +47,19 @@ func (h *HttpCheck) Run(serviceName string) error {
 
 	req, err := http.NewRequest("GET", h.Url, nil)
 	if err != nil {
-		return err
+		return errors.New(fmt.Sprintf("[%s - %s] %s", serviceName, h.Name, err.Error()))
 	}
 	req.Close = true
 	resp, err := client.Do(req)
 
 	if err != nil {
-		return err
+		return errors.New(fmt.Sprintf("[%s - %s] %s", serviceName, h.Name, err.Error()))
 	}
 
 	if resp.StatusCode != h.Code {
+		buf := &bytes.Buffer{}
+		buf.ReadFrom(resp.Body)
+		log.Println(buf.String())
 		return errors.New(fmt.Sprintf("[%s - %s] Invalid status code: got %d, expecting %d", serviceName, h.Name, resp.StatusCode, h.Code))
 	}
 
@@ -64,7 +68,7 @@ func (h *HttpCheck) Run(serviceName string) error {
 		buf := &bytes.Buffer{}
 		_, err = buf.ReadFrom(resp.Body)
 		if err != nil {
-			return err
+			return errors.New(fmt.Sprintf("[%s - %s] %s", serviceName, h.Name, err.Error()))
 		}
 
 		if !strings.Contains(buf.String(), h.MatchBody) {
