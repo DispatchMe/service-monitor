@@ -54,8 +54,12 @@ func (g *GraphiteCheck) Run(serviceName string) error {
 	query.Add("format", "json")
 
 	response := make([]*GraphiteResponse, 0)
-	resp, err := http.Get(shared.GraphiteConf.Url + "render?" + query.Encode())
-
+	req, err := http.NewRequest("GET", shared.GraphiteConf.Url+"render?"+query.Encode(), nil)
+	if err != nil {
+		return err
+	}
+	req.Close = true
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}

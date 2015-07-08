@@ -43,7 +43,13 @@ func (h *HttpCheck) Run(serviceName string) error {
 	client := http.Client{
 		Transport: &transport,
 	}
-	resp, err := client.Get(h.Url)
+
+	req, err := http.NewRequest("GET", h.Url, nil)
+	if err != nil {
+		return err
+	}
+	req.Close = true
+	resp, err := client.Do(req)
 
 	if err != nil {
 		return err
