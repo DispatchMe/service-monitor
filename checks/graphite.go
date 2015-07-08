@@ -12,12 +12,13 @@ import (
 )
 
 type GraphiteCheck struct {
-	Name       string
-	Metric     string
-	Comparator string
-	Operator   string
-	From       string
-	Value      float64
+	serviceName string
+	Name        string
+	Metric      string
+	Comparator  string
+	Operator    string
+	From        string
+	Value       float64
 }
 
 type NullOrFloat float64
@@ -44,39 +45,10 @@ type GraphiteResponse struct {
 	DataPoints [][]NullOrFloat `json:"datapoints"`
 }
 
-func (g *GraphiteCheck) Run(serviceName string) error {
-
-	// Make the query string
-	query := url.Values{}
-
-	query.Add("target", g.Metric)
-	query.Add("from", g.From)
-	query.Add("format", "json")
-
-	response := make([]*GraphiteResponse, 0)
-	req, err := http.NewRequest("GET", shared.GraphiteConf.Url+"render?"+query.Encode(), nil)
-	if err != nil {
-		return errors.New(fmt.Sprintf("[%s - %s] %s", serviceName, g.Name, err.Error()))
-	}
-	req.Close = true
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return errors.New(fmt.Sprintf("[%s - %s] %s", serviceName, g.Name, err.Error()))
-	}
-
-	decoder := json.NewDecoder(resp.Body)
-	err = decoder.Decode(&response)
-	if err != nil {
-		return errors.New(fmt.Sprintf("[%s - %s] %s", serviceName, g.Name, err.Error()))
-	}
-
+func (g *GraphiteCheck) handleMetric(response *GraphiteResponse) error {
 	flist := floatlist.Floatlist{}
 
-	if len(response) == 0 {
-		return errors.New(fmt.Sprintf("[%s - %s] No metric", serviceName, g.Name))
-	}
-
-	for _, p := range response[0].DataPoints {
+	for _, p := range response.DataPoints {
 		flist = append(flist, float64(p[0]))
 	}
 
@@ -111,9 +83,56 @@ func (g *GraphiteCheck) Run(serviceName string) error {
 	}
 
 	if failed {
-		return errors.New(fmt.Sprintf("[%s - %s] failed: %s(%s) %s %.2f (got %.2f)", serviceName, g.Name, g.Operator, g.Metric, g.Comparator, g.Value, aggregateVal))
+		return errors.New(fmt.Sprintf("[%s - %s] failed: %s(%s) %s %.2f (got %.2f)", g.serviceName, g.Name, g.Operator, response.Target, g.Comparator, g.Value, aggregateVal))
 	}
 	return nil
+}
+
+func (g *GraphiteCheck) Run(serviceName string) error {
+	g.serviceName = serviceName
+
+	// Make the query string
+	query := url.Values{}
+
+	query.Add("target", g.Metric)
+	query.Add("from", g.From)
+	query.Add("format", "json")
+
+	response := make([]*GraphiteResponse, 0)
+	req, err := http.NewRequest("GET", shared.GraphiteConf.Url+"render?"+query.Encode(), nil)
+	if err != nil {
+		return errors.New(fmt.Sprintf("[%s - %s] %s", serviceName, g.Name, err.Error()))
+	}
+	req.Close = true
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return errors.New(fmt.Sprintf("[%s - %s] %s", serviceName, g.Name, err.Error()))
+	}
+
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&response)
+	if err != nil {
+		return errors.New(fmt.Sprintf("[%s - %s] %s", serviceName, g.Name, err.Error()))
+	}
+
+	if len(response) == 0 {
+		return errors.New(fmt.Sprintf("[%s - %s] No metric", serviceName, g.Name))
+	}
+
+	errors := []error{}
+	for _, metric := range response {
+		err := g.handleMetric(metric)
+		if err != nil {
+			errors = append(errors, err)
+		}
+	}
+
+	if len(errors) > 0 {
+		return &shared.MultiError{errors}
+	}
+
+	return nil
+
 }
 
 func (g *GraphiteCheck) GetName() string {
