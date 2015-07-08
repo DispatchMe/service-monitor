@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 type GraphiteCheck struct {
@@ -19,6 +20,18 @@ type GraphiteCheck struct {
 	Operator    string
 	From        string
 	Value       float64
+	Whitelist   []string
+	Blacklist   []string
+	parsedLists bool
+}
+
+func strInSlice(slc []string, val string) bool {
+	for _, s := range slc {
+		if s == val {
+			return true
+		}
+	}
+	return false
 }
 
 type NullOrFloat float64
@@ -45,6 +58,25 @@ type GraphiteResponse struct {
 	DataPoints [][]NullOrFloat `json:"datapoints"`
 }
 
+func (g *GraphiteCheck) parseLists() {
+	defer func() {
+		g.parsedLists = true
+	}()
+
+	metricName := g.Metric
+	if !strings.Contains(metricName, "*") {
+		return
+	}
+
+	for i, s := range g.Whitelist {
+		g.Whitelist[i] = strings.Replace(metricName, "*", s, 1)
+	}
+
+	for i, s := range g.Blacklist {
+		g.Blacklist[i] = strings.Replace(metricName, "*", s, 1)
+	}
+
+}
 func (g *GraphiteCheck) handleMetric(response *GraphiteResponse) error {
 	flist := floatlist.Floatlist{}
 
@@ -89,6 +121,10 @@ func (g *GraphiteCheck) handleMetric(response *GraphiteResponse) error {
 }
 
 func (g *GraphiteCheck) Run(serviceName string) error {
+	if !g.parsedLists {
+		g.parseLists()
+	}
+
 	g.serviceName = serviceName
 
 	// Make the query string
@@ -121,6 +157,15 @@ func (g *GraphiteCheck) Run(serviceName string) error {
 
 	errors := []error{}
 	for _, metric := range response {
+		// Check white/black list if there's an asterisk
+		if strInSlice(g.Blacklist, metric.Target) {
+			continue
+		}
+
+		if len(g.Whitelist) > 0 && !strInSlice(g.Whitelist, metric.Target) {
+			continue
+		}
+
 		err := g.handleMetric(metric)
 		if err != nil {
 			errors = append(errors, err)

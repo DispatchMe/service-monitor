@@ -51,14 +51,17 @@ func main() {
 	errChan := make(chan error, 50)
 	okChan := make(chan string, 50)
 
+	log.Println("Starting processes...")
 	go checkForAlerts(errChan, okChan)
 
 	for {
 		for _, s := range conf.Services {
 			for _, c := range s.HttpChecks {
+				log.Printf("Running %s - %s\n", c.Name, s.Name)
 				go runCheck(c, s, errChan, okChan)
 			}
 			for _, c := range s.GraphiteChecks {
+				log.Printf("Running %s - %s\n", c.Name, s.Name)
 				go runCheck(c, s, errChan, okChan)
 			}
 		}
@@ -72,7 +75,7 @@ func checkForAlerts(errChan chan error, okChan chan string) {
 		select {
 		case err := <-errChan:
 			log.Println("Error:", err)
-			slackDriver.SendError(err)
+			// slackDriver.SendError(err)
 		case msg := <-okChan:
 			log.Println(msg)
 		default:
