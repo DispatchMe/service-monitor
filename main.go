@@ -72,7 +72,7 @@ func checkForAlerts(errChan chan error, okChan chan string) {
 		select {
 		case err := <-errChan:
 			log.Println("Error:", err)
-			// slackDriver.SendError(err)
+			slackDriver.SendError(err)
 		case msg := <-okChan:
 			log.Println(msg)
 		default:
