@@ -56,6 +56,8 @@ func (h *HttpCheck) Run(serviceName string) error {
 		return errors.New(fmt.Sprintf("[%s - %s] %s", serviceName, h.Name, err.Error()))
 	}
 
+	defer resp.Body.Close()
+
 	if resp.StatusCode != h.Code {
 		buf := &bytes.Buffer{}
 		buf.ReadFrom(resp.Body)

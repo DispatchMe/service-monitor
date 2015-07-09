@@ -145,6 +145,8 @@ func (g *GraphiteCheck) Run(serviceName string) error {
 		return errors.New(fmt.Sprintf("[%s - %s] %s", serviceName, g.Name, err.Error()))
 	}
 
+	defer resp.Body.Close()
+
 	decoder := json.NewDecoder(resp.Body)
 	err = decoder.Decode(&response)
 	if err != nil {
