@@ -26,6 +26,9 @@ func (s *Slack) SendError(errToSend error) error {
 	if err != nil {
 		return err
 	}
-	_, err = http.Post(s.WebhookUrl, "application/json", buf)
+	resp, err := http.Post(s.WebhookUrl, "application/json", buf)
+
+	defer resp.Body.Close()
+
 	return err
 }
