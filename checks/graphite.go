@@ -1,11 +1,13 @@
 package checks
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/DispatchMe/service-monitor/shared"
 	"github.com/maxwellhealth/go-floatlist"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -147,10 +149,18 @@ func (g *GraphiteCheck) Run(serviceName string) error {
 
 	defer resp.Body.Close()
 
-	decoder := json.NewDecoder(resp.Body)
+	// Parse the body so we can show it if there's an error
+	buf := &bytes.Buffer{}
+	buf.ReadFrom(resp.Body)
+
+	stringVal := buf.String()
+
+	decoder := json.NewDecoder(buf)
 	err = decoder.Decode(&response)
 	if err != nil {
-		return errors.New(fmt.Sprintf("[%s - %s] %s", serviceName, g.Name, err.Error()))
+
+		log.Println(stringVal)
+		return errors.New(fmt.Sprintf("[%s - %s] %s", serviceName, g.Name, "Invalid JSON from Graphite API: "+err.Error()))
 	}
 
 	if len(response) == 0 {
